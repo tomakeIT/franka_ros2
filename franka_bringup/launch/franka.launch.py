@@ -191,7 +191,7 @@ def generate_launch_description():
                               default_value='fr3/fr3.urdf.xacro',
                               description='Path to URDF file'),
         DeclareLaunchArgument('robot_ip',
-                              default_value='172.16.0.3',
+                              default_value='192.168.2.2',
                               description='Hostname or IP address of the robot'),
         DeclareLaunchArgument('load_gripper',
                               default_value='false',
