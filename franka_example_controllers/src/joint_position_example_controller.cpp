@@ -97,53 +97,68 @@ controller_interface::return_type JointPositionExampleController::update(
     const double pos_error = target_q.at(i) - current_q_cmd_.at(i);
     
     // If we're very close to target, just set it directly
-    if (std::abs(pos_error) < 1e-6) {
+    if (std::abs(pos_error) < 1e-4) {  // Slightly larger tolerance
       current_q_cmd_.at(i) = target_q.at(i);
       current_q_vel_.at(i) = 0.0;
       command_interfaces_[i].set_value(current_q_cmd_.at(i));
       continue;
     }
 
-    // Calculate desired velocity towards target
-    double v_des = current_q_vel_.at(i);
+    // Calculate desired velocity towards target with smoother transitions
+    double v_current = current_q_vel_.at(i);
     const double s = (pos_error >= 0.0) ? 1.0 : -1.0;
-
+    
     // Calculate braking distance needed to stop at target
-    const double v_abs = std::abs(v_des);
-    const double d_brake = (v_abs * v_abs) / (2.0 * amax);
+    const double v_abs = std::abs(v_current);
+    const double d_brake = (v_abs * v_abs) / (2.0 * amax) + 1e-4;  // Add small margin
 
+    double v_des = v_current;
+    
     // Decide whether to accelerate or decelerate
-    if (std::abs(pos_error) <= d_brake + 1e-6) {
+    if (std::abs(pos_error) <= d_brake) {
       // We need to start braking to reach the target
       const double dv = amax * dt;
       if (v_abs <= dv) {
         // Can stop within this timestep
         v_des = 0.0;
       } else {
-        // Decelerate
-        v_des -= std::copysign(dv, v_des);
+        // Decelerate smoothly
+        v_des = v_current - std::copysign(dv, v_current);
       }
     } else {
       // We can still accelerate towards target
-      v_des += s * amax * dt;
+      const double dv = amax * dt;
+      v_des = v_current + s * dv;
+      
       // Limit to maximum velocity
       if (std::abs(v_des) > vmax) {
         v_des = std::copysign(vmax, v_des);
       }
     }
 
-    // Update position based on velocity
-    double dq = v_des * dt;
+    // Update position based on velocity (use average velocity for smoother motion)
+    const double v_avg = 0.5 * (v_current + v_des);
+    double dq = v_avg * dt;
     
     // Prevent overshoot
     if (std::abs(dq) > std::abs(pos_error)) {
       dq = pos_error;
-      v_des = 0.0;
+      v_des = dq / dt;  // Adjust velocity to match actual movement
     }
 
     current_q_cmd_.at(i) += dq;
     current_q_vel_.at(i) = v_des;
     command_interfaces_[i].set_value(current_q_cmd_.at(i));
+    
+    // Debug output for joint 0 (can be removed later)
+    if (i == 0 && elapsed_time_ > 1.0) {  // Only after initialization
+      static int debug_counter = 0;
+      if (++debug_counter % 100 == 0) {  // Print every 100 cycles (~0.1s)
+        RCLCPP_INFO(get_node()->get_logger(), 
+                   "Joint %d: target=%.4f, current=%.4f, error=%.4f, vel=%.4f", 
+                   i, target_q.at(i), current_q_cmd_.at(i), pos_error, v_des);
+      }
+    }
   }
 
   return controller_interface::return_type::OK;

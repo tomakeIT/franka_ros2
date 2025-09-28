@@ -61,9 +61,9 @@ class JointPositionExampleController : public controller_interface::ControllerIn
   realtime_tools::RealtimeBuffer<std::array<double, 7>> command_buffer_;
   std::atomic<bool> has_command_{false};
 
-  // Smoothing parameters and internal state
-  double max_joint_velocity_{1.0};          // rad/s
-  double max_joint_acceleration_{2.0};      // rad/s^2
+  // Smoothing parameters and internal state (more conservative values)
+  double max_joint_velocity_{0.5};          // rad/s - reduced for smoother motion
+  double max_joint_acceleration_{1.0};      // rad/s^2 - reduced for smoother motion
   std::array<double, 7> current_q_cmd_{0, 0, 0, 0, 0, 0, 0};
   std::array<double, 7> current_q_vel_{0, 0, 0, 0, 0, 0, 0};
 };
