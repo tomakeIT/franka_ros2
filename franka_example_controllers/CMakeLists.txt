@@ -26,6 +26,8 @@ find_package(pinocchio REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_lifecycle REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(realtime_tools REQUIRED)
 find_package(std_srvs REQUIRED)
 find_package(Eigen3 REQUIRED)
 
@@ -64,6 +66,8 @@ ament_target_dependencies(
         pluginlib
         rclcpp
         rclcpp_lifecycle
+        sensor_msgs
+        realtime_tools
         std_srvs
 )
 

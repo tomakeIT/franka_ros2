@@ -344,7 +344,7 @@ def main():
         # 运动2: 移动到另一个位置
         print("\n运动2: 移动到位置 (0.1, 0.0, 0.5) 现在位置:")
         # controller.print_current_position()
-        if controller.move_to_position(0.2, 0.0, 0.5,-3.14,0,0):
+        if controller.move_to_position(0.5, 0.0, 0.5,-3.14,0,0):
             controller.print_current_position()
         
         # # 运动3: 移动到第三个位置

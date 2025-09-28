@@ -19,6 +19,9 @@
 #include <Eigen/Eigen>
 #include <controller_interface/controller_interface.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <sensor_msgs/msg/joint_state.hpp>
+#include <realtime_tools/realtime_buffer.hpp>
+#include <atomic>
 #include "franka_semantic_components/franka_robot_state.hpp"
 
 using CallbackReturn = rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
@@ -52,6 +55,11 @@ class JointPositionExampleController : public controller_interface::ControllerIn
   double trajectory_period_ = 0.001;
   bool initialization_flag_{true};
   rclcpp::Time start_time_;
+
+  // Subscription to joint state commands and realtime buffer for the last command
+  rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_command_sub_;
+  realtime_tools::RealtimeBuffer<std::array<double, 7>> command_buffer_;
+  std::atomic<bool> has_command_{false};
 };
 
 }  // namespace franka_example_controllers

@@ -54,15 +54,10 @@ JointPositionExampleController::state_interface_configuration() const {
 controller_interface::return_type JointPositionExampleController::update(
     const rclcpp::Time& /*time*/,
     const rclcpp::Duration& /*period*/) {
-  // On first run, capture current positions as default command
   if (initialization_flag_) {
-    std::array<double, 7> current_q{};
     for (int i = 0; i < num_joints; ++i) {
-      current_q.at(i) = state_interfaces_[i].get_value();
-      initial_q_.at(i) = current_q.at(i);
+      initial_q_.at(i) = state_interfaces_[i].get_value();
     }
-    command_buffer_.writeFromNonRT(current_q);
-    has_command_.store(true);
     initialization_flag_ = false;
     if (!is_gazebo_) {
       initial_robot_time_ = state_interfaces_.back().get_value();
@@ -77,15 +72,14 @@ controller_interface::return_type JointPositionExampleController::update(
     }
   }
 
-  // Read the latest commanded joint positions; if none, hold initial
-  const std::array<double, 7>* commanded = nullptr;
-  if (has_command_.load()) {
-    commanded = command_buffer_.readFromRT();
-  }
-  const std::array<double, 7>& target_q = (commanded != nullptr) ? *commanded : initial_q_;
+  double delta_angle = M_PI / 16 * (1 - std::cos(M_PI / 5.0 * elapsed_time_)) * 0.2;
 
   for (int i = 0; i < num_joints; ++i) {
-    command_interfaces_[i].set_value(target_q.at(i));
+    if (i == 4) {
+      command_interfaces_[i].set_value(initial_q_.at(i) - delta_angle);
+    } else {
+      command_interfaces_[i].set_value(initial_q_.at(i) + delta_angle);
+    }
   }
 
   return controller_interface::return_type::OK;
@@ -119,24 +113,7 @@ CallbackReturn JointPositionExampleController::on_configure(
   }
 
   arm_id_ = robot_utils::getRobotNameFromDescription(robot_description_, get_node()->get_logger());
-  // Subscribe to joint command topic
-  auto node = get_node();
-  joint_command_sub_ = node->create_subscription<sensor_msgs::msg::JointState>(
-      "/joint_command", rclcpp::QoS(10),
-      [this](const sensor_msgs::msg::JointState::SharedPtr msg) {
-        if (msg->position.size() < static_cast<size_t>(num_joints)) {
-          RCLCPP_WARN(get_node()->get_logger(),
-                      "Received JointState with insufficient positions: %zu < %d",
-                      msg->position.size(), num_joints);
-          return;
-        }
-        std::array<double, 7> q{};
-        for (int i = 0; i < num_joints; ++i) {
-          q.at(i) = msg->position[i];
-        }
-        command_buffer_.writeFromNonRT(q);
-        has_command_.store(true);
-      });
+
   return CallbackReturn::SUCCESS;
 }
 
