@@ -80,7 +80,7 @@ controller_interface::return_type JointPositionExampleController::update(
     }
   }
 
-  // Read the latest commanded joint positions; if none, hold initial
+  // Always read the most recent commanded joint positions as the target
   const std::array<double, 7>* commanded = nullptr;
   if (has_command_.load()) {
     commanded = command_buffer_.readFromRT();
@@ -92,40 +92,50 @@ controller_interface::return_type JointPositionExampleController::update(
   const double vmax = max_joint_velocity_;
   const double amax = max_joint_acceleration_;
 
-  // Trapezoidal velocity profile step per joint
+  // For each joint, interpolate from current position to target position
   for (int i = 0; i < num_joints; ++i) {
     const double pos_error = target_q.at(i) - current_q_cmd_.at(i);
+    
+    // If we're very close to target, just set it directly
+    if (std::abs(pos_error) < 1e-6) {
+      current_q_cmd_.at(i) = target_q.at(i);
+      current_q_vel_.at(i) = 0.0;
+      command_interfaces_[i].set_value(current_q_cmd_.at(i));
+      continue;
+    }
 
-    // Desired velocity towards target with accel/vel limits
+    // Calculate desired velocity towards target
     double v_des = current_q_vel_.at(i);
-
-    // Compute sign to target
     const double s = (pos_error >= 0.0) ? 1.0 : -1.0;
 
-    // Braking distance with current velocity
+    // Calculate braking distance needed to stop at target
     const double v_abs = std::abs(v_des);
-    const double d_brake = 0.5 * (v_abs * v_abs) / std::max(amax, 1e-6);
+    const double d_brake = (v_abs * v_abs) / (2.0 * amax);
 
-    // If distance small, plan to decelerate; else accelerate
-    if (std::abs(pos_error) <= d_brake) {
-      // Decelerate towards zero velocity
+    // Decide whether to accelerate or decelerate
+    if (std::abs(pos_error) <= d_brake + 1e-6) {
+      // We need to start braking to reach the target
       const double dv = amax * dt;
       if (v_abs <= dv) {
+        // Can stop within this timestep
         v_des = 0.0;
       } else {
-        v_des += -std::copysign(dv, v_des);
+        // Decelerate
+        v_des -= std::copysign(dv, v_des);
       }
     } else {
-      // Accelerate towards target direction
+      // We can still accelerate towards target
       v_des += s * amax * dt;
-      // Clip to max velocity
+      // Limit to maximum velocity
       if (std::abs(v_des) > vmax) {
         v_des = std::copysign(vmax, v_des);
       }
     }
 
-    // Prevent overshoot in position update
+    // Update position based on velocity
     double dq = v_des * dt;
+    
+    // Prevent overshoot
     if (std::abs(dq) > std::abs(pos_error)) {
       dq = pos_error;
       v_des = 0.0;
