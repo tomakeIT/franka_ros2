@@ -1,0 +1,104 @@
+/**: 
+  controller_manager:
+    ros__parameters:
+      update_rate: 1000  # Hz
+
+      # 关节轨迹控制器（用于MoveIt）
+      fr3_arm_controller:
+        type: joint_trajectory_controller/JointTrajectoryController
+
+      # 笛卡尔位置控制器
+      fr3_cartesian_pose_controller:
+        type: cartesian_controllers/CartesianPoseController
+
+      # 笛卡尔速度控制器  
+      fr3_cartesian_velocity_controller:
+        type: cartesian_controllers/CartesianVelocityController
+
+      # 力矩控制器
+      fr3_effort_controller:
+        type: effort_controllers/JointGroupEffortController
+
+      joint_state_broadcaster:
+        type: joint_state_broadcaster/JointStateBroadcaster
+
+/**:
+  # 关节轨迹控制器配置（用于MoveIt规划）
+  fr3_arm_controller:
+    ros__parameters:
+      command_interfaces:
+        - position  # 位置控制，适合轨迹跟踪
+      state_interfaces:
+        - position
+        - velocity
+      joints:
+        - fr3_joint1
+        - fr3_joint2
+        - fr3_joint3
+        - fr3_joint4
+        - fr3_joint5
+        - fr3_joint6
+        - fr3_joint7
+      allow_partial_joints_goal: false
+      open_loop_control: true
+      constraints:
+        stopped_velocity_tolerance: 0.01
+        goal_time: 0.6
+
+  # 笛卡尔位置控制器配置
+  fr3_cartesian_pose_controller:
+    ros__parameters:
+      command_interfaces:
+        - cartesian_pose_command  # 直接控制末端执行器位姿
+      state_interfaces:
+        - position
+        - velocity
+      joints:
+        - fr3_joint1
+        - fr3_joint2
+        - fr3_joint3
+        - fr3_joint4
+        - fr3_joint5
+        - fr3_joint6
+        - fr3_joint7
+      end_effector_link: "fr3_hand_tcp"
+      robot_base_link: "fr3_link0"
+      ft_sensor_ref_link: "fr3_link0"
+      target_frame: "fr3_link0"
+
+  # 笛卡尔速度控制器配置
+  fr3_cartesian_velocity_controller:
+    ros__parameters:
+      command_interfaces:
+        - cartesian_velocity  # 控制末端执行器速度
+      state_interfaces:
+        - position
+        - velocity
+      joints:
+        - fr3_joint1
+        - fr3_joint2
+        - fr3_joint3
+        - fr3_joint4
+        - fr3_joint5
+        - fr3_joint6
+        - fr3_joint7
+      end_effector_link: "fr3_hand_tcp"
+      robot_base_link: "fr3_link0"
+
+  # 力矩控制器配置
+  fr3_effort_controller:
+    ros__parameters:
+      command_interfaces:
+        - effort  # 直接力矩控制
+      state_interfaces:
+        - position
+        - velocity
+        - effort
+      joints:
+        - fr3_joint1
+        - fr3_joint2
+        - fr3_joint3
+        - fr3_joint4
+        - fr3_joint5
+        - fr3_joint6
+        - fr3_joint7
