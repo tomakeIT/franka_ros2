@@ -60,6 +60,12 @@ class JointPositionExampleController : public controller_interface::ControllerIn
   rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_command_sub_;
   realtime_tools::RealtimeBuffer<std::array<double, 7>> command_buffer_;
   std::atomic<bool> has_command_{false};
+
+  // Smoothing parameters and internal state
+  double max_joint_velocity_{1.0};          // rad/s
+  double max_joint_acceleration_{2.0};      // rad/s^2
+  std::array<double, 7> current_q_cmd_{0, 0, 0, 0, 0, 0, 0};
+  std::array<double, 7> current_q_vel_{0, 0, 0, 0, 0, 0, 0};
 };
 
 }  // namespace franka_example_controllers

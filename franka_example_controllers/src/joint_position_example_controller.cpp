@@ -52,8 +52,8 @@ JointPositionExampleController::state_interface_configuration() const {
 }
 
 controller_interface::return_type JointPositionExampleController::update(
-    const rclcpp::Time& /*time*/,
-    const rclcpp::Duration& /*period*/) {
+    const rclcpp::Time& time,
+    const rclcpp::Duration& period) {
   // On first run, capture current positions as default command
   if (initialization_flag_) {
     std::array<double, 7> current_q{};
@@ -63,6 +63,9 @@ controller_interface::return_type JointPositionExampleController::update(
     }
     command_buffer_.writeFromNonRT(current_q);
     has_command_.store(true);
+    // init smoothing state
+    current_q_cmd_ = current_q;
+    current_q_vel_.fill(0.0);
     initialization_flag_ = false;
     if (!is_gazebo_) {
       initial_robot_time_ = state_interfaces_.back().get_value();
@@ -84,8 +87,53 @@ controller_interface::return_type JointPositionExampleController::update(
   }
   const std::array<double, 7>& target_q = (commanded != nullptr) ? *commanded : initial_q_;
 
+  // Time step
+  const double dt = period.seconds();
+  const double vmax = max_joint_velocity_;
+  const double amax = max_joint_acceleration_;
+
+  // Trapezoidal velocity profile step per joint
   for (int i = 0; i < num_joints; ++i) {
-    command_interfaces_[i].set_value(target_q.at(i));
+    const double pos_error = target_q.at(i) - current_q_cmd_.at(i);
+
+    // Desired velocity towards target with accel/vel limits
+    double v_des = current_q_vel_.at(i);
+
+    // Compute sign to target
+    const double s = (pos_error >= 0.0) ? 1.0 : -1.0;
+
+    // Braking distance with current velocity
+    const double v_abs = std::abs(v_des);
+    const double d_brake = 0.5 * (v_abs * v_abs) / std::max(amax, 1e-6);
+
+    // If distance small, plan to decelerate; else accelerate
+    if (std::abs(pos_error) <= d_brake) {
+      // Decelerate towards zero velocity
+      const double dv = amax * dt;
+      if (v_abs <= dv) {
+        v_des = 0.0;
+      } else {
+        v_des += -std::copysign(dv, v_des);
+      }
+    } else {
+      // Accelerate towards target direction
+      v_des += s * amax * dt;
+      // Clip to max velocity
+      if (std::abs(v_des) > vmax) {
+        v_des = std::copysign(vmax, v_des);
+      }
+    }
+
+    // Prevent overshoot in position update
+    double dq = v_des * dt;
+    if (std::abs(dq) > std::abs(pos_error)) {
+      dq = pos_error;
+      v_des = 0.0;
+    }
+
+    current_q_cmd_.at(i) += dq;
+    current_q_vel_.at(i) = v_des;
+    command_interfaces_[i].set_value(current_q_cmd_.at(i));
   }
 
   return controller_interface::return_type::OK;
